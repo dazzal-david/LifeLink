@@ -11,6 +11,8 @@ import '../screens/organ_donation/organ_donation_screen.dart';
 import '../screens/organ_donation/register_organ_donor_screen.dart';
 import '../screens/organ_donation/seek_organ_screen.dart';
 import '../screens/hospital/hospital_search_screen.dart';
+import '../screens/doctor_search/doctor_search_screen.dart';
+import '../screens/ai_doctor/ai_doctor_screen.dart';
 import '../services/auth_service.dart';
 
 final GoRouter appRouter = GoRouter(
@@ -90,6 +92,14 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/hospital-search',
       builder: (context, state) => const SimpleHospitalSearchScreen(),
+    ),
+    GoRoute(
+    path: '/doctor-search',
+    builder: (context, state) => const SimpleDoctorSearchScreen(),
+    ),
+    GoRoute(
+    path: '/ai-doctor',
+    builder: (context, state) => const AIDoctorScreen(),
     ),
   ],
 );

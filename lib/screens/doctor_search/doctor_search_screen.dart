@@ -3,20 +3,36 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-class SimpleHospitalSearchScreen extends StatefulWidget {
-  const SimpleHospitalSearchScreen({Key? key}) : super(key: key);
+class SimpleDoctorSearchScreen extends StatefulWidget {
+  const SimpleDoctorSearchScreen({Key? key}) : super(key: key);
 
   @override
-  _SimpleHospitalSearchScreenState createState() => _SimpleHospitalSearchScreenState();
+  _SimpleDoctorSearchScreenState createState() => _SimpleDoctorSearchScreenState();
 }
 
-class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen> {
-  final _searchController = TextEditingController();
+class _SimpleDoctorSearchScreenState extends State<SimpleDoctorSearchScreen> {
+  final _locationController = TextEditingController();
+  final _specialtyController = TextEditingController();
   bool _isLoading = false;
   bool _isLoaded = false;
-  List<Map<String, dynamic>> _hospitals = [];
+  List<Map<String, dynamic>> _doctors = [];
 
+  // Move this to secure configuration in production
   static const String _googleApiKey = 'AIzaSyDUdmED_YAApTax2-EKLgkrW4v5WozPTDg';
+
+  // Predefined list of medical specialties
+  final List<String> _specialties = [
+    'General Practitioner',
+    'Cardiologist',
+    'Dermatologist',
+    'Pediatrician',
+    'Neurologist',
+    'Orthopedist',
+    'Gynecologist',
+    'Psychiatrist',
+    'Dentist',
+    'Ophthalmologist',
+  ];
 
   @override
   void initState() {
@@ -30,18 +46,30 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
     });
   }
 
-  Future<void> _searchHospitals(String query) async {
-    if (query.isEmpty) return;
+  Future<void> _searchDoctors() async {
+    final location = _locationController.text;
+    final specialty = _specialtyController.text;
+    
+    if (location.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a location')),
+      );
+      return;
+    }
 
     setState(() {
       _isLoading = true;
     });
 
     try {
+      final searchQuery = specialty.isNotEmpty 
+          ? '$specialty doctor in $location'
+          : 'doctors in $location';
+
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/place/textsearch/json'
-        '?query=hospitals+in+$query'
-        '&type=hospital'
+        '?query=${Uri.encodeComponent(searchQuery)}'
+        '&type=doctor'
         '&key=$_googleApiKey'
       );
 
@@ -51,29 +79,28 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
         final data = json.decode(response.body);
         final results = List<Map<String, dynamic>>.from(data['results']);
         
-        final hospitals = await Future.wait(
+        // Get detailed information for each doctor
+        final doctors = await Future.wait(
           results.map((place) async {
-            String? phoneNumber;
-            if (place['place_id'] != null) {
-              phoneNumber = await _getPhoneNumber(place['place_id']);
-            }
-            
+            final details = await _getDoctorDetails(place['place_id']);
             return {
               'name': place['name'],
               'address': place['formatted_address'],
-              'phone': phoneNumber,
               'rating': place['rating']?.toString() ?? 'Not rated',
+              'phone': details['phone'],
+              'website': details['website'],
+              'specialty': specialty.isNotEmpty ? specialty : 'Doctor',
               'open_now': place['opening_hours']?['open_now'],
             };
           }),
         );
 
         setState(() {
-          _hospitals = hospitals;
+          _doctors = doctors;
           _isLoading = false;
         });
       } else {
-        throw Exception('Failed to fetch hospitals');
+        throw Exception('Failed to fetch doctors');
       }
     } catch (e) {
       setState(() {
@@ -85,12 +112,12 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
     }
   }
 
-  Future<String?> _getPhoneNumber(String placeId) async {
+  Future<Map<String, dynamic>> _getDoctorDetails(String placeId) async {
     try {
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/place/details/json'
         '?place_id=$placeId'
-        '&fields=formatted_phone_number'
+        '&fields=formatted_phone_number,website,reviews'
         '&key=$_googleApiKey'
       );
 
@@ -98,12 +125,16 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return data['result']['formatted_phone_number'];
+        return {
+          'phone': data['result']['formatted_phone_number'],
+          'website': data['result']['website'],
+          'reviews': data['result']['reviews'],
+        };
       }
     } catch (e) {
-      print('Error fetching phone number: $e');
+      print('Error fetching doctor details: $e');
     }
-    return null;
+    return {'phone': null, 'website': null, 'reviews': null};
   }
 
   @override
@@ -137,7 +168,7 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
-          'Hospital Search',
+          'Doctor Search',
           style: TextStyle(
             color: Color(0xFF2D3748),
             fontWeight: FontWeight.w600,
@@ -153,7 +184,9 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
                 padding: const EdgeInsets.all(24.0),
                 child: Column(
                   children: [
-                    _buildSearchBox(),
+                    _buildSpecialtySelector(),
+                    const SizedBox(height: 16),
+                    _buildLocationSearchBox(),
                     const SizedBox(height: 24),
                     _buildResultsSection(),
                   ],
@@ -185,7 +218,7 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
             image: const DecorationImage(
-              image: NetworkImage('https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80'),
+              image: NetworkImage('https://images.unsplash.com/photo-1505751172876-fa1923c5c528?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80'),
               fit: BoxFit.cover,
             ),
             boxShadow: [
@@ -214,7 +247,7 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
                 Text(
-                  'Find Hospitals Nearby',
+                  'Find Doctors Nearby',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 22,
@@ -223,7 +256,7 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Search for hospitals in your area',
+                  'Search for specialized doctors in your area',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -237,7 +270,79 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
     );
   }
 
-  Widget _buildSearchBox() {
+  Widget _buildSpecialtySelector() {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 800),
+      curve: Curves.easeOutQuad,
+      transform: Matrix4.translationValues(
+        0, 
+        _isLoaded ? 0 : 30, 
+        0
+      ),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 800),
+        opacity: _isLoaded ? 1.0 : 0.0,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Autocomplete<String>(
+            optionsBuilder: (TextEditingValue textEditingValue) {
+              if (textEditingValue.text.isEmpty) {
+                return const Iterable<String>.empty();
+              }
+              return _specialties.where((String option) {
+                return option.toLowerCase()
+                    .contains(textEditingValue.text.toLowerCase());
+              });
+            },
+            onSelected: (String selection) {
+              _specialtyController.text = selection;
+            },
+            fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+              return TextField(
+                controller: controller,
+                focusNode: focusNode,
+                decoration: InputDecoration(
+                  hintText: 'Select specialty (optional)',
+                  hintStyle: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 14,
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.medical_services,
+                    color: Color(0xFF009688),
+                  ),
+                  suffixIcon: IconButton(
+                    icon: const Icon(
+                      Icons.clear,
+                      color: Color(0xFF009688),
+                    ),
+                    onPressed: () {
+                      controller.clear();
+                      _specialtyController.clear();
+                    },
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationSearchBox() {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 800),
       curve: Curves.easeOutQuad,
@@ -262,33 +367,28 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
             ],
           ),
           child: TextField(
-            controller: _searchController,
+            controller: _locationController,
             decoration: InputDecoration(
-              hintText: 'Enter location to find hospitals...',
+              hintText: 'Enter location to find doctors...',
               hintStyle: TextStyle(
                 color: Colors.grey[400],
                 fontSize: 14,
               ),
               prefixIcon: const Icon(
-                Icons.search,
+                Icons.location_on,
                 color: Color(0xFF009688),
               ),
               suffixIcon: IconButton(
                 icon: const Icon(
-                  Icons.clear,
+                  Icons.search,
                   color: Color(0xFF009688),
                 ),
-                onPressed: () {
-                  _searchController.clear();
-                  setState(() {
-                    _hospitals.clear();
-                  });
-                },
+                onPressed: _searchDoctors,
               ),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
-            onSubmitted: (value) => _searchHospitals(value),
+            onSubmitted: (_) => _searchDoctors(),
           ),
         ),
       ),
@@ -311,11 +411,11 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (_hospitals.isNotEmpty)
+              if (_doctors.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: Text(
-                    'Found ${_hospitals.length} hospitals',
+                    'Found ${_doctors.length} doctors',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -330,12 +430,12 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
                         valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF009688)),
                       ),
                     )
-                  : _hospitals.isEmpty 
+                  : _doctors.isEmpty 
                     ? Center(
                         child: Text(
-                          _searchController.text.isEmpty
-                            ? 'Enter a location to search for hospitals'
-                            : 'No hospitals found',
+                          _locationController.text.isEmpty
+                            ? 'Enter a location to search for doctors'
+                            : 'No doctors found',
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 16,
@@ -343,9 +443,9 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
                         ),
                       )
                     : ListView.builder(
-                        itemCount: _hospitals.length,
+                        itemCount: _doctors.length,
                         itemBuilder: (context, index) {
-                          final hospital = _hospitals[index];
+                          final doctor = _doctors[index];
                           return Container(
                             margin: const EdgeInsets.only(bottom: 16),
                             decoration: BoxDecoration(
@@ -369,7 +469,7 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
                                     children: [
                                       Expanded(
                                         child: Text(
-                                          hospital['name'],
+                                          doctor['name'],
                                           style: const TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.bold,
@@ -377,7 +477,7 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
                                           ),
                                         ),
                                       ),
-                                      if (hospital['rating'] != null)
+                                      if (doctor['rating'] != null)
                                         Container(
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 8,
@@ -396,7 +496,7 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
                                               ),
                                               const SizedBox(width: 4),
                                               Text(
-                                                hospital['rating'],
+                                                doctor['rating'],
                                                 style: const TextStyle(
                                                   color: Color(0xFF009688),
                                                   fontWeight: FontWeight.bold,
@@ -407,15 +507,33 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
                                         ),
                                     ],
                                   ),
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF009688).withOpacity(0.05),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      doctor['specialty'],
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF009688),
+                                      ),
+                                    ),
+                                  ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    hospital['address'],
+                                    doctor['address'],
                                     style: TextStyle(
                                       color: Colors.grey[600],
                                       fontSize: 14,
                                     ),
                                   ),
-                                  if (hospital['phone'] != null) ...[
+                                  if (doctor['phone'] != null) ...[
                                     const SizedBox(height: 8),
                                     Row(
                                       children: [
@@ -426,7 +544,7 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
                                         ),
                                         const SizedBox(width: 8),
                                         Text(
-                                          hospital['phone'],
+                                          doctor['phone'],
                                           style: const TextStyle(
                                             color: Color(0xFF009688),
                                             fontSize: 14,
@@ -435,22 +553,46 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
                                       ],
                                     ),
                                   ],
-                                  if (hospital['open_now'] != null) ...[
+                                  if (doctor['website'] != null) ...[
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.language,
+                                          size: 16,
+                                          color: Colors.grey[600],
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            doctor['website'],
+                                            style: const TextStyle(
+                                              color: Color(0xFF009688),
+                                              fontSize: 14,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                  if (doctor['open_now'] != null) ...[
                                     const SizedBox(height: 8),
                                     Row(
                                       children: [
                                         Icon(
                                           Icons.access_time,
                                           size: 16,
-                                          color: hospital['open_now']
+                                          color: doctor['open_now']
                                               ? Colors.green
                                               : Colors.red,
                                         ),
                                         const SizedBox(width: 8),
                                         Text(
-                                          hospital['open_now'] ? 'Open now' : 'Closed',
+                                          doctor['open_now'] ? 'Open now' : 'Closed',
                                           style: TextStyle(
-                                            color: hospital['open_now']
+                                            color: doctor['open_now']
                                                 ? Colors.green
                                                 : Colors.red,
                                             fontSize: 14,
@@ -475,7 +617,8 @@ class _SimpleHospitalSearchScreenState extends State<SimpleHospitalSearchScreen>
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _locationController.dispose();
+    _specialtyController.dispose();
     super.dispose();
   }
 }
