@@ -113,7 +113,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'Welcome to VitalLink',
+                  'Welcome to CareSync',
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,

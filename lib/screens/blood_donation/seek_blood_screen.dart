@@ -15,11 +15,23 @@ class _SeekBloodScreenState extends State<SeekBloodScreen> {
   final _locationController = TextEditingController();
   bool _isLoading = false;
   List<Map<String, dynamic>> _donors = [];
+  List<Map<String, dynamic>> _compatibleDonors = [];
   String? _errorMessage;
 
   final List<String> _bloodTypes = [
     'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'
   ];
+
+  final Map<String, List<String>> _compatibleBloodTypes = {
+    'A+': ['A+', 'A-', 'O+', 'O-'],
+    'A-': ['A-', 'O-'],
+    'B+': ['B+', 'B-', 'O+', 'O-'],
+    'B-': ['B-', 'O-'],
+    'AB+': ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
+    'AB-': ['A-', 'B-', 'AB-', 'O-'],
+    'O+': ['O+', 'O-'],
+    'O-': ['O-'],
+  };
 
   @override
   void dispose() {
@@ -34,21 +46,24 @@ class _SeekBloodScreenState extends State<SeekBloodScreen> {
       _isLoading = true;
       _errorMessage = null;
       _donors = [];
+      _compatibleDonors = [];
     });
     
     try {
       final supabase = Supabase.instance.client;
+      final List<String> compatibleBloodTypes = _compatibleBloodTypes[_selectedBloodType] ?? [];
       
       final response = await supabase
           .from('blood_donors')
           .select('*')
-          .eq('blood_type', _selectedBloodType)
+          .or(compatibleBloodTypes.map((type) => 'blood_type.eq.$type').join(','))
           .ilike('location', '%${_locationController.text.trim()}%')
           .eq('availability', true);
       
       if (mounted) {
         setState(() {
-          _donors = List<Map<String, dynamic>>.from(response);
+          _donors = List<Map<String, dynamic>>.from(response).where((donor) => donor['blood_type'] == _selectedBloodType).toList();
+          _compatibleDonors = List<Map<String, dynamic>>.from(response).where((donor) => donor['blood_type'] != _selectedBloodType).toList();
         });
       }
     } catch (e) {
@@ -268,6 +283,85 @@ class _SeekBloodScreenState extends State<SeekBloodScreen> {
                     ],
                   ),
                 ),
+              ),
+            ],
+            if (_compatibleDonors.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              Text(
+                'Other compatible donors available',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _compatibleDonors.length,
+                itemBuilder: (context, index) {
+                  final donor = _compatibleDonors[index];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Text(
+                                  donor['blood_type'],
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Location: ${donor['location']}',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          if (donor['last_donation_date'] != null) ...[
+                            Text(
+                              'Last donated: ${DateTime.parse(donor['last_donation_date']).toLocal().toString().split(' ')[0]}',
+                              style: TextStyle(
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          ElevatedButton.icon(
+                            onPressed: () => _callDonor(donor['contact']),
+                            icon: const Icon(Icons.phone),
+                            label: const Text('Contact Donor'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ],

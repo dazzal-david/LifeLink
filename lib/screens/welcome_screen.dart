@@ -102,7 +102,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Welcome to\nVitalLink',
+                    'Welcome to\nCareSync',
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,

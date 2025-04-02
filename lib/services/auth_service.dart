@@ -1,210 +1,81 @@
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:elderly_care/config/supabase_config.dart';
-import 'package:elderly_care/models/user_model.dart';
 
-class AuthService {
-  final _supabase = SupabaseConfig.supabase;
-  DateTime get _currentTime => DateTime.now().toUtc();
-
-  Future<void> signIn({
-    required String email,
-    required String password,
-  }) async {
+class AuthService extends ChangeNotifier {
+  SupabaseClient? _supabase;
+  User? _user;
+  
+  User? get user => _user;
+  bool get isAuthenticated => _user != null;
+  
+  AuthService() {
+    _init();
+  }
+  
+  Future<void> _init() async {
     try {
-      final response = await _supabase.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
+      _supabase = Supabase.instance.client;
+      _user = _supabase?.auth.currentUser;
 
-      if (response.user == null) {
-        throw Exception('Login failed');
-      }
+      _supabase?.auth.onAuthStateChange.listen((data) {
+        final AuthChangeEvent event = data.event;
+        final Session? session = data.session;
 
-      final username = email.split('@')[0].toLowerCase();
+        if (event == AuthChangeEvent.signedIn && session?.user != null) {
+          _user = session!.user;
+        } else if (event == AuthChangeEvent.signedOut) {
+          _user = null;
+        }
 
-      final profileData = await _supabase
-          .from('profiles')
-          .select()
-          .eq('username', username)
-          .maybeSingle();
-
-      if (profileData == null) {
-        await _supabase.from('profiles').insert({
-          'username': username,
-          'name': email.split('@')[0],
-          'age': 0,
-          'blood_group': '',
-          'height': 0,
-          'weight': 0,
-          'gender': 'Not Specified',
-          'medical_conditions': [],
-          'disabilities': [],
-          'allergies': [],
-          'created_at': _currentTime.toIso8601String(),
-          'updated_at': _currentTime.toIso8601String(),
-        });
-      }
+        notifyListeners();
+      });
     } catch (e) {
-      if (e is AuthException) {
-        throw Exception('Invalid email or password');
-      } else if (e is PostgrestException) {
-        print('PostgrestException: ${e.message}');
-      } else {
-        print('Other error: $e');
-        throw Exception('An error occurred while signing in');
-      }
+      debugPrint('Error initializing Supabase: $e');
     }
   }
+  
 
-  Future<void> signUp({
-    required String email,
-    required String password,
-    required UserModel userData,
-  }) async {
-    try {
-      final response = await _supabase.auth.signUp(
-        email: email,
-        password: password,
-      );
-
-      if (response.user == null) {
-        throw Exception('Registration failed');
-      }
-
-      final username = email.split('@')[0].toLowerCase();
-
-      // Wait a brief moment for auth to propagate
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // Create the profile in the profiles table
-      await _supabase.from('profiles').insert({
-        'username': username,
-        'name': userData.name,
-        'age': userData.age,
-        'blood_group': userData.bloodGroup,
-        'height': userData.height,
-        'weight': userData.weight,
-        'gender': userData.gender,
-        'medical_conditions': userData.medicalConditions,
-        'disabilities': userData.disabilities,
-        'allergies': userData.allergies,
-        'emergency_contact_name': userData.emergencyContactName,
-        'emergency_contact_phone': userData.emergencyContactPhone,
-        'created_at': _currentTime.toIso8601String(),
-        'updated_at': _currentTime.toIso8601String(),
-      }).select();
-
-      // After successful registration, sign in the user automatically
-      await signIn(email: email, password: password);
-    } catch (e) {
-      print('SignUp error: $e');
-      if (e is AuthException) {
-        throw Exception('Registration failed: ${e.message}');
-      } else if (e is PostgrestException) {
-        print('PostgrestException: ${e.message}');
-        throw Exception('Failed to create profile. Please try again.');
-      } else {
-        throw Exception('An unexpected error occurred');
-      }
-    }
-  }
-
-  Future<UserModel?> getCurrentUser() async {
-  try {
-    final email = _supabase.auth.currentUser?.email;
-    if (email == null) throw Exception('No authenticated user found');
-
-    final username = email.split('@')[0].toLowerCase();
-    final response = await _supabase
-        .from('profiles')
-        .select()
-        .eq('username', username)
-        .single();
-
-    if (response == null) throw Exception('Profile not found');
+  Future<void> signUp({required String email, required String password}) async {
+    if (_supabase == null) throw Exception('Supabase client not initialized');
     
-    return UserModel.fromJson(response);
-  } catch (e) {
-    print('GetCurrentUser error: $e');
-    throw Exception('Failed to load user profile: $e');
-  }
-}
-
-  Future<void> updateProfile(UserModel userData) async {
     try {
-      final email = _supabase.auth.currentUser?.email;
-      if (email == null) throw Exception('User not authenticated');
-
-      final username = email.split('@')[0].toLowerCase();
-
-      await _supabase
-          .from('profiles')
-          .update({
-            'name': userData.name,
-            'age': userData.age,
-            'blood_group': userData.bloodGroup,
-            'height': userData.height,
-            'weight': userData.weight,
-            'gender': userData.gender,
-            'medical_conditions': userData.medicalConditions,
-            'disabilities': userData.disabilities,
-            'allergies': userData.allergies,
-            'emergency_contact_name': userData.emergencyContactName,
-            'emergency_contact_phone': userData.emergencyContactPhone,
-            'updated_at': _currentTime.toIso8601String(),
-          })
-          .eq('username', username)
-          .select();
+      await _supabase!.auth.signUp(email: email, password: password);
     } catch (e) {
-      print('UpdateProfile error: $e');
-      throw Exception('Failed to update profile');
+      debugPrint('SignUp Error: $e');
+      throw Exception('Failed to sign up. Please try again.');
+    }
+  }
+  
+  Future<void> signIn({required String email, required String password}) async {
+    if (_supabase == null) throw Exception('Supabase client not initialized');
+    
+    try {
+      await _supabase!.auth.signInWithPassword(email: email, password: password);
+    } catch (e) {
+      debugPrint('SignIn Error: $e');
+      throw Exception('Failed to sign in. Please check your credentials.');
     }
   }
 
   Future<void> signOut() async {
+    if (_supabase == null) throw Exception('Supabase client not initialized');
+    
     try {
-      await _supabase.auth.signOut();
+      await _supabase!.auth.signOut();
     } catch (e) {
-      print('SignOut error: $e');
-      throw Exception('Failed to sign out');
+      debugPrint('SignOut Error: $e');
+      throw Exception('Failed to sign out. Please try again.');
     }
   }
-
-  Future<bool> isAuthenticated() async {
+  
+  Future<void> resetPassword(String email) async {
+    if (_supabase == null) throw Exception('Supabase client not initialized');
+    
     try {
-      final session = _supabase.auth.currentSession;
-      if (session == null) return false;
-
-      final username = session.user.email?.split('@')[0].toLowerCase();
-      if (username == null) return false;
-
-      final profileData = await _supabase
-          .from('profiles')
-          .select()
-          .eq('username', username)
-          .maybeSingle();
-
-      if (profileData == null) {
-        await _supabase.from('profiles').insert({
-          'username': username,
-          'name': username,
-          'age': 0,
-          'blood_group': '',
-          'height': 0,
-          'weight': 0,
-          'gender': 'Not Specified',
-          'medical_conditions': [],
-          'disabilities': [],
-          'allergies': [],
-          'created_at': _currentTime.toIso8601String(),
-          'updated_at': _currentTime.toIso8601String(),
-        }).select();
-      }
-
-      return true;
+      await _supabase!.auth.resetPasswordForEmail(email);
     } catch (e) {
-      print('IsAuthenticated error: $e');
-      return false;
+      debugPrint('Password Reset Error: $e');
+      throw Exception('Failed to send password reset email.');
     }
   }
-}
+} 

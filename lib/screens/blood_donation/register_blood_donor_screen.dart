@@ -13,6 +13,7 @@ class RegisterBloodDonorScreen extends StatefulWidget {
 class _RegisterBloodDonorScreenState extends State<RegisterBloodDonorScreen> {
   final _formKey = GlobalKey<FormState>();
   String _selectedBloodType = 'A+';
+  String _selectedGender = 'Male';
   final _locationController = TextEditingController();
   final _contactController = TextEditingController();
   DateTime? _lastDonationDate;
@@ -22,7 +23,11 @@ class _RegisterBloodDonorScreenState extends State<RegisterBloodDonorScreen> {
   String? _errorMessage;
 
   final List<String> _bloodTypes = [
-    'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'
+    'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'HH'
+  ];
+
+  final List<String> _genders = [
+    'Male', 'Female'
   ];
 
   @override
@@ -62,6 +67,7 @@ class _RegisterBloodDonorScreenState extends State<RegisterBloodDonorScreen> {
         setState(() {
           _isRegistered = true;
           _selectedBloodType = response['blood_type'];
+          _selectedGender = response['gender'];
           _locationController.text = response['location'];
           _contactController.text = response['contact'];
           _isAvailable = response['availability'];
@@ -113,6 +119,16 @@ class _RegisterBloodDonorScreenState extends State<RegisterBloodDonorScreen> {
 
       if (userId == null) {
         throw Exception('User not authenticated');
+      }
+
+      if (_lastDonationDate != null) {
+        final now = DateTime.now();
+        final difference = now.difference(_lastDonationDate!);
+        if (_selectedGender == 'Male' && difference.inDays < 90) {
+          throw Exception('Male donors must wait at least 3 months between donations.');
+        } else if (_selectedGender == 'Female' && difference.inDays < 180) {
+          throw Exception('Female donors must wait at least 6 months between donations.');
+        }
       }
 
       await supabase.from('blood_donors').insert({
@@ -269,6 +285,37 @@ class _RegisterBloodDonorScreenState extends State<RegisterBloodDonorScreen> {
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please select a blood type';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Gender',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: _selectedGender,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _genders.map((String gender) {
+                    return DropdownMenuItem<String>(
+                      value: gender,
+                      child: Text(gender),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    if (newValue != null) {
+                      setState(() {
+                        _selectedGender = newValue;
+                      });
+                    }
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please select your gender';
                     }
                     return null;
                   },

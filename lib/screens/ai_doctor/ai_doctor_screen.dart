@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:elderly_care/services/ai_doctor_service.dart';
+import 'package:flutter/services.dart';
+import 'package:caresync/services/ai_doctor_service.dart';
+
 
 class AIDoctorScreen extends StatefulWidget {
   const AIDoctorScreen({super.key});
@@ -14,11 +16,19 @@ class _AIDoctorScreenState extends State<AIDoctorScreen> {
   final AIDoctorService _aiService = AIDoctorService();
   final ScrollController _scrollController = ScrollController();
   bool _isLoading = false;
+  bool _isLoaded = false;
 
   @override
   void initState() {
     super.initState();
     _addWelcomeMessage();
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        setState(() {
+          _isLoaded = true;
+        });
+      }
+    });
   }
 
   void _addWelcomeMessage() {
@@ -68,75 +78,85 @@ class _AIDoctorScreenState extends State<AIDoctorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Color(0xFF4A6FFF),
+              size: 18,
+            ),
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Text(
           'AI Health Assistant',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Color(0xFF2D3748),
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        backgroundColor: Colors.teal,
-        foregroundColor: Colors.white,
-        elevation: 4,
       ),
-      body: Container(
-        color: Colors.grey[50],
+      body: SafeArea(
         child: Column(
           children: [
-            // Help instructions card
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Card(
-                elevation: 2,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.teal, size: 28),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Type your health question below and tap the SEND button',
-                          style: TextStyle(fontSize: 18, height: 1.3),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            
+            _buildHeaderSection(),
             Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                reverse: true,
-                itemCount: _messages.length,
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                itemBuilder: (context, index) => _messages[index],
-              ),
-            ),
-            
-            if (_isLoading)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                        color: Colors.teal,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      reverse: true,
+                      itemCount: _messages.length,
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      itemBuilder: (context, index) => _messages[index],
+                    ),
+                  ),
+                  if (_isLoading)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              color: Color(0xFF4A6FFF),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Text(
+                            'Getting your answer...',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Color(0xFF4A6FFF),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Text(
-                      'Getting your answer...',
-                      style: TextStyle(fontSize: 18, color: Colors.teal),
-                    ),
-                  ],
-                ),
+                ],
               ),
-              
-            const Divider(height: 1, thickness: 1),
+            ),
             _buildMessageComposer(),
           ],
         ),
@@ -144,73 +164,157 @@ class _AIDoctorScreenState extends State<AIDoctorScreen> {
     );
   }
 
+  Widget _buildHeaderSection() {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 800),
+      curve: Curves.easeOutQuad,
+      transform: Matrix4.translationValues(
+        0, 
+        _isLoaded ? 0 : 30, 
+        0
+      ),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 800),
+        opacity: _isLoaded ? 1.0 : 0.0,
+        child: Container(
+          width: double.infinity,
+          margin: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF4A6FFF), Color(0xFF6B8BFF)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF4A6FFF).withOpacity(0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(
+                  Icons.health_and_safety_rounded,
+                  size: 32,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AI Health Assistant',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Get instant answers to your health questions',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildMessageComposer() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
             offset: const Offset(0, -2),
-            blurRadius: 4,
-            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            color: Colors.black.withOpacity(0.05),
           ),
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Type your question here:',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            textAlign: TextAlign.left,
+          const Text(
+            'Ask your question',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF2D3748),
+            ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey[400]!),
-                    borderRadius: BorderRadius.circular(12),
+                    color: const Color(0xFFF8F9FA),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: TextField(
                     controller: _messageController,
                     decoration: InputDecoration(
-                      hintText: 'Example: What helps with headaches?',
-                      hintStyle: TextStyle(color: Colors.grey[500], fontSize: 16),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      border: InputBorder.none,
+                      hintText: 'Type your health question...',
+                      hintStyle: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 16,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.all(16),
                     ),
-                    style: const TextStyle(fontSize: 18),
-                    maxLines: 2,
+                    maxLines: 3,
                     minLines: 1,
-                    keyboardType: TextInputType.text,
-                    textCapitalization: TextCapitalization.sentences,
                   ),
                 ),
               ),
               const SizedBox(width: 12),
-              ElevatedButton(
-                onPressed: () => _handleSubmitted(_messageController.text),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF4A6FFF), Color(0xFF6B8BFF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  elevation: 2,
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.send, size: 20),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'SEND',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF4A6FFF).withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
                     ),
                   ],
+                ),
+                child: IconButton(
+                  onPressed: () => _handleSubmitted(_messageController.text),
+                  icon: const Icon(Icons.send_rounded),
+                  color: Colors.white,
+                  padding: const EdgeInsets.all(12),
                 ),
               ),
             ],
@@ -241,64 +345,72 @@ class ChatMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
           if (!isUser) ...[
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: Colors.teal,
-              child: const Icon(Icons.medical_services, color: Colors.white, size: 28),
+            Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF4A6FFF), Color(0xFF6B8BFF)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              padding: const EdgeInsets.all(8),
+              child: const Icon(
+                Icons.health_and_safety_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
             ),
-            const SizedBox(width: 12.0),
+            const SizedBox(width: 12),
           ],
-          Expanded(
-            child: Column(
-              crossAxisAlignment:
-                  isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text(
-                    isUser ? 'You' : 'Health Assistant',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: isUser ? Colors.grey[700] : Colors.teal,
-                    ),
-                  ),
-                ),
-                Material(
-                  borderRadius: BorderRadius.circular(16.0),
-                  color: isUser
-                      ? Colors.blue[100]
-                      : Colors.teal[50],
-                  elevation: 1,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 12.0,
-                      horizontal: 16.0,
-                    ),
-                    child: Text(
-                      text,
-                      style: TextStyle(
-                        color: Colors.black87,
-                        fontSize: 18,
-                        height: 1.4,
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isUser 
+                    ? const Color(0xFF4A6FFF).withOpacity(0.1)
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: isUser
+                    ? null
+                    : Border.all(
+                        color: Colors.grey.withOpacity(0.1),
                       ),
+                boxShadow: [
+                  if (!isUser)
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
                     ),
-                  ),
+                ],
+              ),
+              child: Text(
+                text,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: isUser
+                      ? const Color(0xFF2D3748)
+                      : const Color(0xFF2D3748),
+                  height: 1.5,
                 ),
-              ],
+              ),
             ),
           ),
           if (isUser) ...[
-            const SizedBox(width: 12.0),
+            const SizedBox(width: 12),
             CircleAvatar(
-              radius: 24,
-              backgroundColor: Colors.blue[100],
-              child: const Icon(Icons.person, color: Colors.black87, size: 28),
+              backgroundColor: const Color(0xFF4A6FFF).withOpacity(0.1),
+              child: const Icon(
+                Icons.person,
+                color: Color(0xFF4A6FFF),
+              ),
             ),
           ],
         ],
